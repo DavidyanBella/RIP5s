@@ -1,6 +1,7 @@
 from django.contrib import admin
-from app.models import *
 
-admin.site.register(Person)
+from .models import *
+
+admin.site.register(Character)
 admin.site.register(Artwork)
-admin.site.register(PersonArtwork)
+admin.site.register(CharacterArtwork)
