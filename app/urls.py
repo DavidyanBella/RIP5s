@@ -23,9 +23,9 @@ urlpatterns = [
     path('api/artworks/<int:artwork_id>/update_character/<int:character_id>/', update_character_in_artwork),  # PUT
     path('api/artworks/<int:artwork_id>/delete_character/<int:character_id>/', delete_character_from_artwork),  # DELETE
 
-    # Набор методов пользователей
-    path('api/users/register/', register), # POST
-    path('api/users/login/', login), # POST
-    path('api/users/logout/', logout), # POST
-    path('api/users/<int:user_id>/update/', update_user) # PUT
+    # Набор методов для аутентификации и авторизации
+    path("api/users/register/", register),  # POST
+    path("api/users/login/", login),  # POST
+    path("api/users/logout/", logout),  # POST
+    path("api/users/<int:user_id>/update/", update_user)  # PUT
 ]

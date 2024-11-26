@@ -18,7 +18,8 @@ class CharactersSerializer(serializers.ModelSerializer):
 
 
 class CharacterSerializer(CharactersSerializer):
-    class Meta(CharactersSerializer.Meta):
+    class Meta:
+        model = Character
         fields = "__all__"
 
 
@@ -33,7 +34,7 @@ class ArtworksSerializer(serializers.ModelSerializer):
 
 class ArtworkSerializer(ArtworksSerializer):
     characters = serializers.SerializerMethodField()
-            
+
     def get_characters(self, artwork):
         items = CharacterArtwork.objects.filter(artwork=artwork)
         return [CharacterItemSerializer(item.character, context={"comment": item.comment}).data for item in items]
@@ -82,5 +83,11 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    username = serializers.CharField(required=True)
-    password = serializers.CharField(required=True)
+    username = serializers.CharField(required=False)
+    password = serializers.CharField(required=False)
+
+
+class UserProfileSerializer(serializers.Serializer):
+    username = serializers.CharField(required=False)
+    email = serializers.CharField(required=False)
+    password = serializers.CharField(required=False)

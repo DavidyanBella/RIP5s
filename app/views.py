@@ -1,28 +1,43 @@
 import random
 from datetime import datetime, timedelta
+import uuid
 
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
+from .permissions import *
+from .redis import session_storage
 from .serializers import *
+from .utils import identity_user, get_session
 
 
-def get_draft_artwork():
-    return Artwork.objects.filter(status=1).first()
+def get_draft_artwork(request):
+    user = identity_user(request)
+
+    if user is None:
+        return None
+
+    artwork = Artwork.objects.filter(owner=user).filter(status=1).first()
+
+    return artwork
 
 
-def get_user():
-    return User.objects.filter(is_superuser=False).first()
-
-
-def get_moderator():
-    return User.objects.filter(is_superuser=True).first()
-
-
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[
+        openapi.Parameter(
+            'character_name',
+            openapi.IN_QUERY,
+            type=openapi.TYPE_STRING
+        )
+    ]
+)
 @api_view(["GET"])
 def search_characters(request):
     character_name = request.GET.get("character_name", "")
@@ -33,13 +48,13 @@ def search_characters(request):
         characters = characters.filter(name__icontains=character_name)
 
     serializer = CharactersSerializer(characters, many=True)
-    
-    draft_artwork = get_draft_artwork()
+
+    draft_artwork = get_draft_artwork(request)
 
     resp = {
         "characters": serializer.data,
         "characters_count": CharacterArtwork.objects.filter(artwork=draft_artwork).count() if draft_artwork else None,
-        "draft_artwork": draft_artwork.pk if draft_artwork else None
+        "draft_artwork_id": draft_artwork.pk if draft_artwork else None
     }
 
     return Response(resp)
@@ -57,13 +72,14 @@ def get_character_by_id(request, character_id):
 
 
 @api_view(["PUT"])
+@permission_classes([IsModerator])
 def update_character(request, character_id):
     if not Character.objects.filter(pk=character_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     character = Character.objects.get(pk=character_id)
 
-    serializer = CharacterSerializer(character, data=request.data, partial=True)
+    serializer = CharacterSerializer(character, data=request.data)
 
     if serializer.is_valid(raise_exception=True):
         serializer.save()
@@ -72,6 +88,7 @@ def update_character(request, character_id):
 
 
 @api_view(["POST"])
+@permission_classes([IsModerator])
 def create_character(request):
     serializer = CharacterSerializer(data=request.data, partial=False)
 
@@ -86,6 +103,7 @@ def create_character(request):
 
 
 @api_view(["DELETE"])
+@permission_classes([IsModerator])
 def delete_character(request, character_id):
     if not Character.objects.filter(pk=character_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
@@ -94,30 +112,31 @@ def delete_character(request, character_id):
     character.status = 2
     character.save()
 
-    characters = Character.objects.filter(status=1)
-    serializer = CharacterSerializer(characters, many=True)
+    character = Character.objects.filter(status=1)
+    serializer = CharacterSerializer(character, many=True)
 
     return Response(serializer.data)
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def add_character_to_artwork(request, character_id):
     if not Character.objects.filter(pk=character_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     character = Character.objects.get(pk=character_id)
 
-    draft_artwork = get_draft_artwork()
+    draft_artwork = get_draft_artwork(request)
 
     if draft_artwork is None:
         draft_artwork = Artwork.objects.create()
-        draft_artwork.owner = get_user()
         draft_artwork.date_created = timezone.now()
+        draft_artwork.owner = identity_user(request)
         draft_artwork.save()
 
     if CharacterArtwork.objects.filter(artwork=draft_artwork, character=character).exists():
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
-        
+
     item = CharacterArtwork.objects.create()
     item.artwork = draft_artwork
     item.character = character
@@ -128,6 +147,7 @@ def add_character_to_artwork(request, character_id):
 
 
 @api_view(["POST"])
+@permission_classes([IsModerator])
 def update_character_image(request, character_id):
     if not Character.objects.filter(pk=character_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
@@ -135,25 +155,53 @@ def update_character_image(request, character_id):
     character = Character.objects.get(pk=character_id)
 
     image = request.data.get("image")
-    if image is not None:
-        character.image = image
-        character.save()
+
+    if image is None:
+        return Response(status.HTTP_400_BAD_REQUEST)
+
+    character.image = image
+    character.save()
 
     serializer = CharacterSerializer(character)
 
     return Response(serializer.data)
 
 
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[
+        openapi.Parameter(
+            'status',
+            openapi.IN_QUERY,
+            type=openapi.TYPE_STRING
+        ),
+        openapi.Parameter(
+            'date_formation_start',
+            openapi.IN_QUERY,
+            type=openapi.TYPE_STRING
+        ),
+        openapi.Parameter(
+            'date_formation_end',
+            openapi.IN_QUERY,
+            type=openapi.TYPE_STRING
+        )
+    ]
+)
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def search_artworks(request):
-    status = int(request.GET.get("status", 0))
+    status_id = int(request.GET.get("status", 0))
     date_formation_start = request.GET.get("date_formation_start")
     date_formation_end = request.GET.get("date_formation_end")
 
     artworks = Artwork.objects.exclude(status__in=[1, 5])
 
-    if status > 0:
-        artworks = artworks.filter(status=status)
+    user = identity_user(request)
+    if not user.is_superuser:
+        artworks = artworks.filter(owner=user)
+
+    if status_id > 0:
+        artworks = artworks.filter(status=status_id)
 
     if date_formation_start and parse_datetime(date_formation_start):
         artworks = artworks.filter(date_formation__gte=parse_datetime(date_formation_start))
@@ -167,19 +215,26 @@ def search_artworks(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def get_artwork_by_id(request, artwork_id):
-    if not Artwork.objects.filter(pk=artwork_id).exists():
+    user = identity_user(request)
+
+    if not Artwork.objects.filter(pk=artwork_id, owner=user).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     artwork = Artwork.objects.get(pk=artwork_id)
-    serializer = ArtworkSerializer(artwork, many=False)
+    serializer = ArtworkSerializer(artwork)
 
     return Response(serializer.data)
 
 
+@swagger_auto_schema(method='put', request_body=ArtworkSerializer)
 @api_view(["PUT"])
+@permission_classes([IsAuthenticated])
 def update_artwork(request, artwork_id):
-    if not Artwork.objects.filter(pk=artwork_id).exists():
+    user = identity_user(request)
+
+    if not Artwork.objects.filter(pk=artwork_id, owner=user).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     artwork = Artwork.objects.get(pk=artwork_id)
@@ -192,8 +247,11 @@ def update_artwork(request, artwork_id):
 
 
 @api_view(["PUT"])
+@permission_classes([IsAuthenticated])
 def update_status_user(request, artwork_id):
-    if not Artwork.objects.filter(pk=artwork_id).exists():
+    user = identity_user(request)
+
+    if not Artwork.objects.filter(pk=artwork_id, owner=user).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     artwork = Artwork.objects.get(pk=artwork_id)
@@ -205,12 +263,13 @@ def update_status_user(request, artwork_id):
     artwork.date_formation = timezone.now()
     artwork.save()
 
-    serializer = ArtworkSerializer(artwork, many=False)
+    serializer = ArtworkSerializer(artwork)
 
     return Response(serializer.data)
 
 
 @api_view(["PUT"])
+@permission_classes([IsModerator])
 def update_status_admin(request, artwork_id):
     if not Artwork.objects.filter(pk=artwork_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
@@ -228,17 +287,22 @@ def update_status_admin(request, artwork_id):
     if request_status == 3:
         artwork.count = random.randint(100, 1000)
 
-    artwork.date_complete = timezone.now()
     artwork.status = request_status
-    artwork.moderator = get_moderator()
+    artwork.date_complete = timezone.now()
+    artwork.moderator = identity_user(request)
     artwork.save()
 
-    return Response(status=status.HTTP_200_OK)
+    serializer = ArtworkSerializer(artwork)
+
+    return Response(serializer.data)
 
 
 @api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
 def delete_artwork(request, artwork_id):
-    if not Artwork.objects.filter(pk=artwork_id).exists():
+    user = identity_user(request)
+
+    if not Artwork.objects.filter(pk=artwork_id, owner=user).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     artwork = Artwork.objects.get(pk=artwork_id)
@@ -249,33 +313,46 @@ def delete_artwork(request, artwork_id):
     artwork.status = 5
     artwork.save()
 
-    serializer = ArtworkSerializer(artwork, many=False)
-
-    return Response(serializer.data)
+    return Response(status=status.HTTP_200_OK)
 
 
 @api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
 def delete_character_from_artwork(request, artwork_id, character_id):
+    user = identity_user(request)
+
+    if not Artwork.objects.filter(pk=artwork_id, owner=user).exists():
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
     if not CharacterArtwork.objects.filter(artwork_id=artwork_id, character_id=character_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     item = CharacterArtwork.objects.get(artwork_id=artwork_id, character_id=character_id)
     item.delete()
 
-    items = CharacterArtwork.objects.filter(artwork_id=artwork_id)
-    data = [CharacterItemSerializer(item.character, context={"comment": item.comment}).data for item in items]
+    artwork = Artwork.objects.get(pk=artwork_id)
 
-    return Response(data, status=status.HTTP_200_OK)
+    serializer = ArtworkSerializer(artwork)
+    characters = serializer.data["characters"]
+
+    return Response(characters)
 
 
+@swagger_auto_schema(method='PUT', request_body=CharacterArtworkSerializer)
 @api_view(["PUT"])
+@permission_classes([IsAuthenticated])
 def update_character_in_artwork(request, artwork_id, character_id):
+    user = identity_user(request)
+
+    if not Artwork.objects.filter(pk=artwork_id, owner=user).exists():
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
     if not CharacterArtwork.objects.filter(character_id=character_id, artwork_id=artwork_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     item = CharacterArtwork.objects.get(character_id=character_id, artwork_id=artwork_id)
 
-    serializer = CharacterArtworkSerializer(item, data=request.data,  partial=True)
+    serializer = CharacterArtworkSerializer(item, data=request.data, partial=True)
 
     if serializer.is_valid():
         serializer.save()
@@ -283,22 +360,15 @@ def update_character_in_artwork(request, artwork_id, character_id):
     return Response(serializer.data)
 
 
-@api_view(["POST"])
-def register(request):
-    serializer = UserRegisterSerializer(data=request.data)
-
-    if not serializer.is_valid():
-        return Response(status=status.HTTP_409_CONFLICT)
-
-    user = serializer.save()
-
-    serializer = UserSerializer(user)
-
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
+@swagger_auto_schema(method='post', request_body=UserLoginSerializer)
 @api_view(["POST"])
 def login(request):
+    user = identity_user(request)
+
+    if user is not None:
+        serializer = UserSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
     serializer = UserLoginSerializer(data=request.data)
 
     if not serializer.is_valid():
@@ -308,27 +378,69 @@ def login(request):
     if user is None:
         return Response(status=status.HTTP_401_UNAUTHORIZED)
 
-    serializer = UserSerializer(user)
+    session_id = str(uuid.uuid4())
+    session_storage.set(session_id, user.id)
 
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    serializer = UserSerializer(user)
+    response = Response(serializer.data, status=status.HTTP_200_OK)
+    response.set_cookie("session_id", session_id, samesite="lax")
+
+    return response
+
+
+@swagger_auto_schema(method='post', request_body=UserRegisterSerializer)
+@api_view(["POST"])
+def register(request):
+    serializer = UserRegisterSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(status=status.HTTP_409_CONFLICT)
+
+    user = serializer.save()
+
+    session_id = str(uuid.uuid4())
+    session_storage.set(session_id, user.id)
+
+    serializer = UserSerializer(user)
+    response = Response(serializer.data, status=status.HTTP_201_CREATED)
+    response.set_cookie("session_id", session_id, samesite="lax")
+
+    return response
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def logout(request):
-    return Response(status=status.HTTP_200_OK)
+    session = get_session(request)
+    session_storage.delete(session)
+
+    response = Response(status=status.HTTP_200_OK)
+    response.delete_cookie('session_id')
+
+    return response
 
 
+@swagger_auto_schema(method='PUT', request_body=UserProfileSerializer)
 @api_view(["PUT"])
+@permission_classes([IsAuthenticated])
 def update_user(request, user_id):
     if not User.objects.filter(pk=user_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    user = User.objects.get(pk=user_id)
-    serializer = UserSerializer(user, data=request.data, partial=True)
+    user = identity_user(request)
 
+    if user.pk != user_id:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    serializer = UserSerializer(user, data=request.data, partial=True)
     if not serializer.is_valid():
         return Response(status=status.HTTP_409_CONFLICT)
 
     serializer.save()
 
-    return Response(serializer.data)
+    password = request.data.get("password", None)
+    if password is not None and not user.check_password(password):
+        user.set_password(password)
+        user.save()
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
