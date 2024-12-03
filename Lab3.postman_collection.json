@@ -7,7 +7,7 @@
 	},
 	"item": [
 		{
-			"name": "Артефакты",
+			"name": "Персонажи",
 			"protocolProfileBehavior": {
 				"disableBodyPruning": true
 			},
@@ -41,7 +41,7 @@
 			"response": []
 		},
 		{
-			"name": "Артефакт",
+			"name": "Персонаж",
 			"request": {
 				"method": "GET",
 				"header": [],
@@ -63,7 +63,7 @@
 			"response": []
 		},
 		{
-			"name": "Обновление артефакта",
+			"name": "Обновление персонажа",
 			"request": {
 				"method": "PUT",
 				"header": [],
@@ -95,7 +95,7 @@
 			"response": []
 		},
 		{
-			"name": "Создание артефакта",
+			"name": "Создание персонажа",
 			"request": {
 				"method": "POST",
 				"header": [],
@@ -117,7 +117,7 @@
 			"response": []
 		},
 		{
-			"name": "Удаление артефакта",
+			"name": "Удаление персонажа",
 			"request": {
 				"method": "DELETE",
 				"header": [],
@@ -140,7 +140,7 @@
 			"response": []
 		},
 		{
-			"name": "Добавление артефакта в произведение",
+			"name": "Добавление персонажа в произведение",
 			"request": {
 				"method": "POST",
 				"header": [
@@ -169,7 +169,7 @@
 			"response": []
 		},
 		{
-			"name": "Обновление фото артефакта",
+			"name": "Обновление фото персонажа",
 			"request": {
 				"method": "POST",
 				"header": [],
@@ -179,7 +179,7 @@
 						{
 							"key": "image",
 							"type": "file",
-							"src": "/C:/Users/Ярослав/Desktop/sports-car-futuristic-mountain-sunset-scenery-digital-art-2k-wallpaper-uhdpaper.com-537@0@i.jpg"
+							"src": "/C:/Users/bella/588941_original.jpg"
 						}
 					]
 				},
@@ -401,7 +401,7 @@
 			"response": []
 		},
 		{
-			"name": "Удаление артефакта из произведения",
+			"name": "Удаление персонажа из произведения",
 			"request": {
 				"method": "DELETE",
 				"header": [],
