@@ -1,7 +1,11 @@
-FROM python
+FROM node:18.13.0-alpine
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
-COPY req.txt ./
+COPY package.json ./
 
-RUN pip install -r req.txt
+RUN npm install
+
+COPY . .
+
+CMD ["npm", "run", "dev"]
