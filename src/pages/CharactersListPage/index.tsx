@@ -41,9 +41,6 @@ const CharactersListPage = ({characters, setCharacters, isMock, setIsMock, chara
         }
     }
 
-    useEffect(() => {
-        fetchData()
-    }, []);
 
     return (
         <Container>
