@@ -1,1 +1,1 @@
-if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/RIP5s/sw.js', { scope: '/RIP5s/' })})}
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/RIP5s/tree/Pages/pages/frontend/sw.js', { scope: '/RIP5s/tree/Pages/pages/frontend/' })})}
