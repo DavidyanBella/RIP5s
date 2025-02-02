@@ -85,6 +85,10 @@ def add_artworks():
     add_artwork(4, characters, users[0], moderators)
     add_artwork(5, characters, users[0], moderators)
 
+    for _ in range(10):
+        status = random.randint(2, 5)
+        add_artwork(status, characters, users[0], moderators)
+
 
 def add_artwork(status, characters, owner, moderators):
     artwork = Artwork.objects.create()

@@ -23,7 +23,7 @@ class Character(models.Model):
         verbose_name = "Артефакт"
         verbose_name_plural = "Артефакты"
         db_table = "characters"
-        ordering = ("pk",)
+        ordering = ("pk", )
 
 
 class Artwork(models.Model):

@@ -8,7 +8,8 @@ from django.utils.dateparse import parse_datetime
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from .permissions import *
@@ -71,6 +72,7 @@ def get_character_by_id(request, character_id):
     return Response(serializer.data)
 
 
+@swagger_auto_schema(method='put', request_body=CharacterSerializer)
 @api_view(["PUT"])
 @permission_classes([IsModerator])
 def update_character(request, character_id):
@@ -87,17 +89,19 @@ def update_character(request, character_id):
     return Response(serializer.data)
 
 
+@swagger_auto_schema(method='POST', request_body=CharacterAddSerializer)
 @api_view(["POST"])
 @permission_classes([IsModerator])
+@parser_classes((MultiPartParser,))
 def create_character(request):
-    serializer = CharacterSerializer(data=request.data, partial=False)
+    serializer = CharacterAddSerializer(data=request.data)
 
     serializer.is_valid(raise_exception=True)
 
     Character.objects.create(**serializer.validated_data)
 
     characters = Character.objects.filter(status=1)
-    serializer = CharacterSerializer(characters, many=True)
+    serializer = CharactersSerializer(characters, many=True)
 
     return Response(serializer.data)
 
@@ -146,8 +150,15 @@ def add_character_to_artwork(request, character_id):
     return Response(serializer.data["characters"])
 
 
+@swagger_auto_schema(
+    method='post',
+    manual_parameters=[
+        openapi.Parameter('image', openapi.IN_FORM, type=openapi.TYPE_FILE),
+    ]
+)
 @api_view(["POST"])
 @permission_classes([IsModerator])
+@parser_classes((MultiPartParser,))
 def update_character_image(request, character_id):
     if not Character.objects.filter(pk=character_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
@@ -173,7 +184,7 @@ def update_character_image(request, character_id):
         openapi.Parameter(
             'status',
             openapi.IN_QUERY,
-            type=openapi.TYPE_STRING
+            type=openapi.TYPE_NUMBER
         ),
         openapi.Parameter(
             'date_formation_start',
@@ -204,10 +215,10 @@ def search_artworks(request):
         artworks = artworks.filter(status=status_id)
 
     if date_formation_start and parse_datetime(date_formation_start):
-        artworks = artworks.filter(date_formation__gte=parse_datetime(date_formation_start))
+        artworks = artworks.filter(date_formation__gte=parse_datetime(date_formation_start) - timedelta(days=1))
 
     if date_formation_end and parse_datetime(date_formation_end):
-        artworks = artworks.filter(date_formation__lt=parse_datetime(date_formation_end))
+        artworks = artworks.filter(date_formation__lt=parse_datetime(date_formation_end) + timedelta(days=1))
 
     serializer = ArtworksSerializer(artworks, many=True)
 
@@ -219,10 +230,14 @@ def search_artworks(request):
 def get_artwork_by_id(request, artwork_id):
     user = identity_user(request)
 
-    if not Artwork.objects.filter(pk=artwork_id, owner=user).exists():
+    if not Artwork.objects.filter(pk=artwork_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     artwork = Artwork.objects.get(pk=artwork_id)
+
+    if not user.is_superuser and artwork.owner != user:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
     serializer = ArtworkSerializer(artwork)
 
     return Response(serializer.data)
@@ -268,6 +283,7 @@ def update_status_user(request, artwork_id):
     return Response(serializer.data)
 
 
+@swagger_auto_schema(method='put', request_body=UpdateArtworkStatusAdminSerializer)
 @api_view(["PUT"])
 @permission_classes([IsModerator])
 def update_status_admin(request, artwork_id):
@@ -363,12 +379,6 @@ def update_character_in_artwork(request, artwork_id, character_id):
 @swagger_auto_schema(method='post', request_body=UserLoginSerializer)
 @api_view(["POST"])
 def login(request):
-    user = identity_user(request)
-
-    if user is not None:
-        serializer = UserSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-        
     serializer = UserLoginSerializer(data=request.data)
 
     if not serializer.is_valid():

@@ -1,36 +1,35 @@
-import {useState} from "react";
-import Header from "components/Header";
-import Breadcrumbs from "components/Breadcrumbs";
-import CharacterPage from "pages/CharacterPage";
-import CharactersListPage from "pages/CharactersListPage";
 import {Route, Routes} from "react-router-dom";
-import {T_Character} from "src/modules/types.ts";
 import {Container, Row} from "reactstrap";
-import HomePage from "pages/HomePage";
 import "./styles.css"
+import HomePage from "pages/HomePage/HomePage.tsx";
+import LoginPage from "pages/LoginPage/LoginPage.tsx";
+import RegisterPage from "pages/RegisterPage/RegisterPage.tsx";
+import CharactersListPage from "pages/CharactersListPage/CharactersListPage.tsx";
+import CharacterPage from "pages/CharacterPage/CharacterPage.tsx";
+import ArtworksPage from "pages/ArtworksPage/ArtworksPage.tsx";
+import ArtworkPage from "pages/ArtworkPage/ArtworkPage.tsx";
+import ProfilePage from "pages/ProfilePage/ProfilePage.tsx";
+import Header from "components/Header/Header.tsx";
+import Breadcrumbs from "components/Breadcrumbs/Breadcrumbs.tsx";
 
 function App() {
-
-    const [characters, setCharacters] = useState<T_Character[]>([])
-
-    const [selectedCharacter, setSelectedCharacter] = useState<T_Character | null>(null)
-
-    const [isMock, setIsMock] = useState(false);
-
-    const [characterName, setCharacterName] = useState<string>("")
-
     return (
         <div>
-            <Header/>
+            <Header />
             <Container className="pt-4">
                 <Row className="mb-3">
-                    <Breadcrumbs selectedCharacter={selectedCharacter} />
+                    <Breadcrumbs />
                 </Row>
                 <Row>
                     <Routes>
-						<Route path="/" element={<HomePage />} />
-                        <Route path="/characters/" element={<CharactersListPage characters={characters} setCharacters={setCharacters} isMock={isMock} setIsMock={setIsMock} characterName={characterName} setCharacterName={setCharacterName}/>} />
-                        <Route path="/characters/:id" element={<CharacterPage selectedCharacter={selectedCharacter} setSelectedCharacter={setSelectedCharacter} isMock={isMock} setIsMock={setIsMock}/>} />
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/login/" element={<LoginPage />} />
+                        <Route path="/register/" element={<RegisterPage />} />
+                        <Route path="/characters/" element={<CharactersListPage />} />
+                        <Route path="/characters/:id/" element={<CharacterPage />} />
+                        <Route path="/artworks/" element={<ArtworksPage />} />
+                        <Route path="/artworks/:id/" element={<ArtworkPage />} />
+                        <Route path="/profile/" element={<ProfilePage />} />
                     </Routes>
                 </Row>
             </Container>

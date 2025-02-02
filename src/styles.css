@@ -26,12 +26,7 @@
     --search-color--hover: #fff;
 }
 
-body {
-    color: var(--text-color) !important;
-    background: var(--root-bg) !important;
-}
-
-.wrapper {
+#root {
     color: var(--text-color);
     background: var(--root-bg);
     min-height: 100vh;
@@ -41,13 +36,16 @@ body {
     background-color: var(--header-bg);
 }
 
-.nav-link, .navbar-brand{
+.navbar-brand .nav-link {
     color: var(--header-color) !important;
-    white-space: normal !important;
 }
 
-.nav-link:hover, .navbar-brand:hover{
+.nav-link{
     color: hsl(from var(--header-color) h s calc(l - 10)) !important;
+}
+
+.nav-link:hover, .navbar-brand:hover, .nav-link.active{
+    color: var(--header-color) !important;
 }
 
 .navbar .title {
@@ -67,13 +65,14 @@ body {
     color: var(--primary-btn-color--hover) !important;
 }
 
+.delete-draft-artwork-btn {
+    width: 150px;
+}
+
 .search-btn.btn.btn-primary {
     background-color: var(--search-bg) !important;
     border-color: var(--search-border) !important;
     color: var(--search-color) !important;
-}
-.btn:focus {
-    box-shadow: none !important;
 }
 
 .search-btn.btn.btn-primary:hover {
@@ -84,12 +83,19 @@ body {
 .btn:focus {
     box-shadow: none !important;
 }
-.card {
-    background: var(--card-bg) !important;
-    color: var(--card-text) !important;
-    border-color: var(--card-border-color) !important;
+.bin-wrapper {
+    max-width: 150px;
+    width: 100%;
 }
-
+.bin {
+    position: relative;
+}
+.badge.bg-secondary {
+    top: -10px !important;
+    right: -10px !important;
+    position: absolute !important;
+    background: var(--primary-color) !important;
+}
 .breadcrumb-item::before{
     color: #0d6eFd !important;
 }

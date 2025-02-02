@@ -23,6 +23,12 @@ class CharacterSerializer(CharactersSerializer):
         fields = "__all__"
 
 
+class CharacterAddSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Character
+        fields = ("name", "description", "category", "image")
+
+
 class ArtworksSerializer(serializers.ModelSerializer):
     owner = serializers.StringRelatedField(read_only=True)
     moderator = serializers.StringRelatedField(read_only=True)
@@ -57,10 +63,14 @@ class CharacterArtworkSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class UpdateArtworkStatusAdminSerializer(serializers.Serializer):
+    status = serializers.IntegerField(required=True)
+
+    
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'username')
+        fields = ('id', 'username', "is_superuser")
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
@@ -83,8 +93,8 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    username = serializers.CharField(required=False)
-    password = serializers.CharField(required=False)
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True)
 
 
 class UserProfileSerializer(serializers.Serializer):
